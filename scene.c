@@ -6,7 +6,7 @@
 
 #include <stdlib.h>
 
-Camera camera_create(Point3 center, Point3 lower_left_corner, Vec3 horizontal, Vec3 vertical, int image_width, int image_height)
+Camera camera_create(Point3 center, Point3 lower_left_corner, Vec3 horizontal, Vec3 vertical, int image_width, int image_height, size_t samples_per_pixel)
 {
     Camera cam;
     cam.center = center;
@@ -15,6 +15,7 @@ Camera camera_create(Point3 center, Point3 lower_left_corner, Vec3 horizontal, V
     cam.pixel00_loc = lower_left_corner;
     cam.image_width = image_width;
     cam.image_height = image_height;
+    cam.samples_per_pixel = samples_per_pixel;
     return cam;
 }
 
@@ -29,8 +30,8 @@ Color ray_color(Scene *scene, Ray r, int depth)
 {
     HitRecord rec;
     bool hit_anything = false;
-    double closest_so_far = 1000.0; // Infinity-ish
-    double t_min = 0.0001;          // Minimum distance (prevents shadow acne - colliding with self)
+    double closest_so_far = 100000.0; // Infinity-ish
+    double t_min = 0.001;             // Minimum distance (shadow acne prevention)
 
     if (depth <= 0)
         return vec3_create(0, 0, 0);
@@ -48,20 +49,16 @@ Color ray_color(Scene *scene, Ray r, int depth)
 
     if (hit_anything)
     {
-        Vec3 unit_direction = vec3_unit(r.direction);
-        Vec3 reflected = vec3_reflect(unit_direction, rec.normal);
-        Ray scattered = ray_create(rec.p, reflected);
-
+        Ray scattered;
+        Color attenuation;
+        if (!scatter_ray(&rec.material, r, &rec, &attenuation, &scattered))
+        {
+            return vec3_create(0, 0, 0); // Absorbed
+        }
         // Call the function on the reflected ray
         Color reflection_color = ray_color(scene, scattered, depth - 1);
 
-        // Interpolate the base color of the object with the reflection color based on reflectivity
-        double r = rec.material.reflectivity;
-
-        Color matte_part = vec3_scale(rec.material.color, 1.0 - r);
-        Color shiny_part = vec3_scale(reflection_color, r);
-
-        return vec3_add(matte_part, shiny_part);
+        return vec3_mul(attenuation, reflection_color);
     }
 
     // --- 3. Background (Sky) ---
@@ -102,14 +99,21 @@ Ray camera_get_ray(Camera *cam, int pixel_x, int pixel_y)
 
 void render_scene(FILE *output, Scene *scene, Camera *camera, int max_depth)
 {
-
+    double scale = 1.0 / (double)camera->samples_per_pixel;
+    fprintf(stderr, "Rendering %d x %d image with %zu samples per pixel\n", camera->image_width, camera->image_height, camera->samples_per_pixel);
     fprintf(output, "P3\n%d %d\n255\n", camera->image_width, camera->image_height);
     for (int j = camera->image_height - 1; j >= 0; j--)
     {
         for (int i = 0; i < camera->image_width; i++)
         {
-            Ray r = camera_get_ray(camera, i, j);
-            Color pixel_color = ray_color(scene, r, max_depth);
+            Color pixel_color = vec3_create(0, 0, 0);
+            for (size_t s = 0; s < camera->samples_per_pixel; s++)
+            {
+                Ray r = camera_get_ray(camera, i, j);
+                Color sample_color = ray_color(scene, r, max_depth);
+                pixel_color = vec3_add(pixel_color, sample_color);
+            }
+            pixel_color = vec3_scale(pixel_color, scale);
             vec3_write_color(output, pixel_color);
         }
     }

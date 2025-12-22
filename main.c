@@ -10,10 +10,21 @@
 #define HEIGHT 1080
 
 Hittable world[] = {
-    {HITTABLE_SPHERE, .object.sphere = {{0, 0, -1}, 0.5}, {.color = {0.7, 0.3, 0.3}, .reflectivity = 0.1}},       // Reflective Red Sphere
-    {HITTABLE_SPHERE, .object.sphere = {{1, 0, -1.5}, 0.5}, {.color = {0.3, 0.3, 0.7}, .reflectivity = 0.9}},     // Highly Reflective Blue Sphere
-    {HITTABLE_SPHERE, .object.sphere = {{-1, 0, -1.5}, 0.5}, {.color = {0.3, 0.7, 0.3}, .reflectivity = 0.2}},    // Less Reflective Green Sphere
-    {HITTABLE_PLANE, .object.plane = {{0, -0.5, 0}, {0, 1, 0}}, {.color = {0.1, 0.2, 0.8}, .reflectivity = 0.1}}, // Reflective Yellow Ground Plane,
+    {HITTABLE_SPHERE, .object.sphere = {{0, 0, -1}, 0.5}, {.color = {0.1, 0.2, 0.5}, .type = MATERIAL_LAMBERTIAN}}, // Center sphere
+    {HITTABLE_SPHERE, .object.sphere = {{1, 0, -1.5}, 0.5}, {
+                                                                .color = {0.3, 0.3, 0.7},
+                                                                .type = MATERIAL_DIELECTRIC,
+                                                                .properties.ref_idx = 0.9,
+                                                            }}, // Right sphere
+    {HITTABLE_SPHERE, .object.sphere = {{-1, 0, -1.5}, 0.5}, {
+                                                                 .color = {0.3, 0.7, 0.3},
+                                                                 .type = MATERIAL_METAL,
+                                                                 .properties.fuzz = 0.0,
+                                                             }}, // Left sphere
+    {HITTABLE_PLANE, .object.plane = {{0, -0.5, 0}, {0, 1, 0}}, {
+                                                                    .color = {0.8, 0.6, 0.2},
+                                                                    .type = MATERIAL_LAMBERTIAN,
+                                                                }}, // Ground Plane,
 };
 
 #define NUM_HITTABLES (sizeof(world) / sizeof(world[0]))
@@ -28,13 +39,13 @@ int main()
     }
 
     Camera camera = camera_create(
-        vec3_create(0, 1.0, 0.5),
-        vec3_create(-2.0, -0.725, -0.5),
+        vec3_create(0, 0.0, 0.5),
+        vec3_create(-2.0, -1.725, -0.5),
         vec3_create(4.0, 0, 0),
         vec3_create(0, 2.25, 0),
-        WIDTH,
-        HEIGHT);
+        WIDTH / 3,
+        HEIGHT / 3, 100); // 100 samples per pixel
 
-    render_scene(stdout, &scene, &camera, 50);
+    render_scene(stdout, &scene, &camera, 10);
     return 0;
 }

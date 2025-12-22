@@ -15,6 +15,13 @@ typedef enum
     HITTABLE_TRIANGLE
 } HittableType;
 
+typedef enum
+{
+    MATERIAL_LAMBERTIAN,
+    MATERIAL_METAL,
+    MATERIAL_DIELECTRIC
+} MaterialType;
+
 typedef struct
 {
     Point3 point;
@@ -24,7 +31,14 @@ typedef struct
 typedef struct
 {
     Color color;
-    double reflectivity;
+
+    MaterialType type;
+    union
+    {
+        double fuzz;    // For metal materials
+        double ref_idx; // For dielectric materials
+    } properties;
+
 } Material;
 
 typedef struct
@@ -61,6 +75,7 @@ typedef struct
     Point3 p;          // The exact point of intersection
     Vec3 normal;       // The surface normal at that point
     Material material; // Material of the hit object
+    bool front_face;   // Whether the hit was on the outside surface
 } HitRecord;
 
 // returns true if the ray hits the sphere between t_min and t_max, recording the information in rec
@@ -71,5 +86,7 @@ bool hit_plane(const Plane *p, Material material, Ray r, double t_min, double t_
 bool hit_triangle(const Triangle *tr, Material material, Ray r, double t_min, double t_max, HitRecord *rec);
 
 bool hit_hittable(const Hittable *h, Ray r, double t_min, double t_max, HitRecord *rec);
+
+bool scatter_ray(const Material *material, Ray r_in, HitRecord *rec, Color *attenuation, Ray *scattered);
 
 #endif // SCENE_H

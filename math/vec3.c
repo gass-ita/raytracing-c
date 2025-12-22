@@ -1,6 +1,7 @@
 #include "vec3.h"
 #include <math.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 void vec3_construct(Vec3 *v, double x, double y, double z)
 {
@@ -73,7 +74,39 @@ Vec3 vec3_reflect(Vec3 v, Vec3 n)
 {
     return vec3_sub(v, vec3_scale(n, 2 * vec3_dot(v, n)));
 }
-#include "vec3.h"
+
+Vec3 vec3_refract(Vec3 uv, Vec3 n, double etai_over_etat)
+{
+    double cos_theta = fmin(vec3_dot(vec3_scale(uv, -1.0), n), 1.0);
+    Vec3 r_out_perp = vec3_scale(vec3_add(uv, vec3_scale(n, cos_theta)), etai_over_etat);
+    Vec3 r_out_parallel = vec3_scale(n, -sqrt(fabs(1.0 - vec3_length_squared(r_out_perp))));
+    return vec3_add(r_out_perp, r_out_parallel);
+}
+// Returns a random real in [0,1)
+double random_double()
+{
+    return rand() / (RAND_MAX + 1.0);
+}
+
+// Returns a random real in [min,max)
+double random_double_range(double min, double max)
+{
+    return min + (max - min) * random_double();
+}
+
+Vec3 random_in_unit_sphere()
+{
+    Vec3 p;
+    do
+    {
+        // Generate a vector where x, y, z are between -1 and 1
+        p = vec3_create(
+            random_double_range(-1, 1),
+            random_double_range(-1, 1),
+            random_double_range(-1, 1));
+    } while (vec3_length_squared(p) >= 1.0); // If outside sphere, try again
+    return p;
+}
 
 void vec3_print(const Vec3 *v)
 {

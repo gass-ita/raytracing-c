@@ -38,9 +38,15 @@ bool hit_sphere(const Sphere *s, Material material, Ray r, double t_min, double 
 
     // check for inword or outward normal
     if (vec3_dot(r.direction, outward_normal) > 0)
+    {
         rec->normal = vec3_scale(outward_normal, -1.0); // Inward
+        rec->front_face = false;
+    }
     else
+    {
         rec->normal = outward_normal;
+        rec->front_face = true;
+    }
 
     rec->material = material;
 
@@ -127,5 +133,78 @@ bool hit_hittable(const Hittable *h, Ray r, double t_min, double t_max, HitRecor
         return hit_triangle(&(h->object.triangle), h->material, r, t_min, t_max, rec);
     default:
         return false;
+    }
+}
+
+bool scatter_metal(const Material *material, Ray r_in, HitRecord *rec, Color *attenuation, Ray *scattered)
+{
+    Vec3 reflected = vec3_reflect(vec3_unit(r_in.direction), rec->normal);
+    // add fuzz
+    reflected = vec3_add(reflected, vec3_scale(random_in_unit_sphere(), material->properties.fuzz));
+
+    *scattered = ray_create(rec->p, vec3_scale(reflected, 1.0));
+    *attenuation = material->color;
+
+    return (vec3_dot(scattered->direction, rec->normal) > 0);
+}
+
+bool scatter_lambertian(const Material *material, Ray r_in, HitRecord *rec, Color *attenuation, Ray *scattered)
+{
+    Vec3 scatter_direction = vec3_add(rec->normal, random_in_unit_sphere());
+
+    // Catch degenerate scatter direction (if random vector opposes normal exactly)
+    if (vec3_length_squared(scatter_direction) < 1e-8)
+    {
+        scatter_direction = rec->normal;
+    }
+
+        *scattered = ray_create(rec->p, vec3_unit(scatter_direction));
+    *attenuation = material->color;
+
+    return true;
+}
+
+bool scatter_dielectric(const Material *material, Ray r_in, HitRecord *rec, Color *a, Ray *scattered)
+{
+    Color attenuation = vec3_create(1.0, 1.0, 1.0); // No attenuation for dielectric
+    double ref_idx = rec->front_face ? (1.0 / material->properties.ref_idx) : material->properties.ref_idx;
+
+    Vec3 unit_direction = vec3_unit(r_in.direction);
+    double cos_theta = fmin(vec3_dot(vec3_scale(unit_direction, -1.0), rec->normal), 1.0);
+    double sin_theta = sqrt(1.0 - cos_theta * cos_theta);
+
+    bool cannot_refract = ref_idx * sin_theta > 1.0;
+    Vec3 direction;
+
+    if (cannot_refract)
+    {
+        direction = vec3_reflect(unit_direction, rec->normal);
+    }
+    else
+    {
+        direction = vec3_refract(unit_direction, rec->normal, ref_idx);
+    }
+
+    *scattered = ray_create(rec->p, direction);
+    *a = attenuation;
+    return true;
+}
+
+bool scatter_ray(const Material *material, Ray r_in, HitRecord *rec, Color *attenuation, Ray *scattered)
+{
+    switch (material->type)
+    {
+    case MATERIAL_LAMBERTIAN:
+        return scatter_lambertian(material, r_in, rec, attenuation, scattered);
+        break;
+    case MATERIAL_METAL:
+        return scatter_metal(material, r_in, rec, attenuation, scattered);
+        break;
+    case MATERIAL_DIELECTRIC:
+        return scatter_dielectric(material, r_in, rec, attenuation, scattered);
+        break;
+    default:
+        return false;
+        break;
     }
 }

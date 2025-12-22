@@ -58,6 +58,10 @@ Vec3 vec3_unit(Vec3 v);
 // Formula: v - 2*dot(v,n)*n
 Vec3 vec3_reflect(Vec3 v, Vec3 n);
 
+Vec3 vec3_refract(Vec3 uv, Vec3 n, double etai_over_etat);
+
+Vec3 random_in_unit_sphere();
+
 // Prints vector to console: "[x, y, z]"
 void vec3_print(const Vec3 *v);
 
